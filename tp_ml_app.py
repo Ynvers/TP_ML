@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import joblib
 from io import BytesIO
+from openpyxl import Workbook
 
 # Charger le modèle
 model = joblib.load('pipeline_model.pkl')
@@ -11,10 +13,24 @@ def create_excel(name, data, prediction):
     df = pd.DataFrame(data, index=[0])
     df['prediction'] = prediction
     df['name'] = name
+
+    # Créer un fichier Excel en utilisant openpyxl directement
     output = BytesIO()
-    writer = pd.ExcelWriter(output, engine='openpyxl')
-    df.to_excel(writer, index=False, sheet_name='Prédiction')
-    writer.save()
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = 'Prédiction'
+    
+    # Ajouter les en-têtes
+    for col_num, column_title in enumerate(df.columns, 1):
+        sheet.cell(row=1, column=col_num, value=column_title)
+
+    # Ajouter les données
+    for row_num, row_data in enumerate(df.values, 2):
+        for col_num, cell_value in enumerate(row_data, 1):
+            sheet.cell(row=row_num, column=col_num, value=cell_value)
+
+    # Sauvegarder le fichier Excel dans BytesIO
+    workbook.save(output)
     processed_data = output.getvalue()
     return processed_data
 
@@ -59,19 +75,18 @@ def formulaire():
 
     # Prédiction
     if st.button('Prédire'):
-        # Utiliser le pipeline complet pour la prédiction
         prediction = model.predict(df)[0]
         st.write(f"La prime d'assurance maladie prédite est : {prediction:.2f} $")
 
         # Télécharger les résultats
-        if st.button('Télécharger les résultats'):
-            excel_data = create_excel(st.session_state.name, data, prediction)
-            st.download_button(
-                label="Télécharger les résultats en format Excel",
-                data=excel_data,
-                file_name=f"prediction_{st.session_state.name}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+        excel_data = create_excel(st.session_state.name, data, prediction)
+        st.download_button(
+            label="Télécharger les résultats en format Excel",
+            data=excel_data,
+            file_name=f"prediction_{st.session_state.name}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="download_button"
+        )
 
 # Navigation entre les pages
 if 'page' not in st.session_state:
